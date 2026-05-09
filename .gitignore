@@ -1,0 +1,41 @@
+# macOS
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+.pnpm-store/
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local config / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# OS
+Thumbs.db
