@@ -15,6 +15,7 @@
 **最终交付**：一份 markdown 文件，可直接喂给 Claude Code / Cursor / Trae / Windsurf 完成实现。
 
 **基于 2026 SOTA**：
+- **Harness Engineering（2025 一线共识）** —— `agent = model + harness`，13 步流程对应 6 层 Harness（上下文 / 工具 / 编排 / 记忆 / 评估 / 约束-恢复）
 - Anthropic *Building Effective Agents* (Dec 2024) —— workflow vs agent + 6 大基础模式
 - Andrew Ng 四大 agentic 设计能力（Reflection / Tool Use / Planning / Multi-Agent）
 - Model Context Protocol (MCP) / Agent-to-Agent (A2A)
@@ -86,7 +87,46 @@ skill 会按以下流程跑：
 
 1. **Simplicity First（简单优先）** —— 能用 workflow 不用 agent；只在必要时才升级。
 2. **Eval First（Eval 先行）** —— 写第一行代码前先约定 5–10 个 golden 用例。
-3. **Observability First（可观测先行）** —— 第一天就接入 trace（LangSmith / Langfuse / Phoenix）。
+3. **Harness First（Harness 先行）** —— 决定 agent 能否落地的是除模型外的整套系统；改 prompt 之前先问 harness 6 层是否完整。可观测性（trace / log / 指标）是 Harness 第 5 层的实现，第一天就接入（LangSmith / Langfuse / Phoenix）。
+
+---
+
+## Harness Engineering 视角
+
+> 2025 业界的统摄共识：`agent = model + harness`。本 skill 把这个视角嵌入 13 步流程。
+
+### 三阶段演进（包含关系，非替代）
+
+```
+┌─────────────────────────────────────────────┐
+│              Harness Engineering            │
+│  ┌────────────────────────────────────┐    │
+│  │       Context Engineering          │    │
+│  │  ┌────────────────────────┐        │    │
+│  │  │   Prompt Engineering   │        │    │
+│  │  └────────────────────────┘        │    │
+│  └────────────────────────────────────┘    │
+└─────────────────────────────────────────────┘
+```
+
+- **Prompt Engineering**：让模型听懂任务（角色、few-shot、约束输出）
+- **Context Engineering**：让模型拿到正确信息（RAG、长文压缩、progressive disclosure）
+- **Harness Engineering**：让模型在真实执行中持续做对（工具 / 编排 / 状态 / 评估 / 约束-恢复 整套外壳）
+
+### 13 步与 Harness 6 层的映射
+
+| Harness 层 | 解决的问题 | 13 步映射 |
+|----|---|----|
+| **L1 上下文** | 角色 / 信息边界 / progressive disclosure | 步骤 2-3, 7 |
+| **L2 工具系统** | 给什么 / 何时调 / 结果回写 | 步骤 6 |
+| **L3 执行编排** | 步骤怎么串、跑偏怎么办 | 步骤 1, 4-5, 8 |
+| **L4 记忆与状态** | working / episodic / semantic / procedural | 步骤 7 |
+| **L5 评估与观测** | 独立验收 + 持续 trace（生产-验收分离） | 步骤 10, 12 |
+| **L6 约束-校验-恢复** | 红线 / 校验 / retry / context reset | 步骤 3, 11, 13 |
+
+参考：
+- LangChain, "The Rise of Context Engineering", 2025 — https://www.langchain.com/blog/the-rise-of-context-engineering
+- Anthropic, "How we built our multi-agent research system", 2025 — https://www.anthropic.com/engineering/built-multi-agent-research-system
 
 ---
 
@@ -117,13 +157,16 @@ iagents/
 
 `agent架构师` 卡在中间：它是一个 **苏格拉底式导师**，按正确顺序问正确的诊断问题，必要时引用 2026 主流模式，**只在你已经赚到这个决策权时才推荐具体框架**。
 
-输出是 **vibe-coding 就绪** 的 —— 不是「考虑做 X」的高层文档，而是带项目结构、依赖清单、代码骨架、eval 用例和分阶段任务路线图的结构化 spec —— AI coding 工具可以一步步执行。
+更重要的是，它把 **Harness Engineering**（2025 业界统摄共识：`agent = model + harness`）作为底层视角，13 步流程显式对应 6 层 Harness。生成的方案不是「选什么框架」的高层决策，而是「6 层 harness 各靠什么落地」的可执行清单 —— 包括对一线公司踩过的最新坑（上下文焦虑 / 自评失真 /「更努力」幻觉 / agent.md 大杂烩）的反模式纠偏。
+
+输出是 **vibe-coding 就绪** 的 —— 不是「考虑做 X」的高层文档，而是带项目结构、依赖清单、代码骨架、eval 用例、Harness 6 层映射表、环境驱动设计自检和分阶段任务路线图的结构化 spec —— AI coding 工具可以一步步执行。
 
 ---
 
 ## Roadmap
 
 - [ ] 更多 skills（eval 设计、prompt 工程、MCP server 设计……）
+- [ ] `harness-debugger` skill —— 针对线上 agent 不稳定时的 6 层 Harness 体检（按层定位是缺哪一层导致跑偏）
 - [ ] `agent架构师` 的英文版
 - [ ] 常见场景的示例架构 spec（客服、研究、SWE 助手）
 

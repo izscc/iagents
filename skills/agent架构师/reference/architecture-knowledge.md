@@ -5,6 +5,72 @@
 
 ---
 
+## 0. 三阶段演进与 Harness Engineering（2025 统摄共识）
+
+### 0.1 三阶段演进
+
+2023–2025 的 AI 工程经历了三次明显的重心迁移，三者是**包含关系**而非替代：
+
+| 阶段 | 解决的核心问题 | 关键工具 / 范式 | 代表时期 |
+|------|---------------|----------------|---------|
+| **Prompt Engineering** | 模型有没有听懂任务 | 角色设定、few-shot、CoT、约束输出 | 2023 |
+| **Context Engineering** | 模型有没有拿到足够且正确的信息 | RAG、上下文裁剪、长文压缩、progressive disclosure（agent skills） | 2024 |
+| **Harness Engineering** | 模型在真实执行中能不能持续做对 | 工具系统 / 编排 / 状态 / 评估 / 约束-恢复 的整套外壳 | 2025+ |
+
+```
+┌─────────────────────────────────────────────┐
+│              Harness Engineering            │
+│  ┌────────────────────────────────────┐    │
+│  │       Context Engineering          │    │
+│  │  ┌────────────────────────┐        │    │
+│  │  │   Prompt Engineering   │        │    │
+│  │  └────────────────────────┘        │    │
+│  └────────────────────────────────────┘    │
+└─────────────────────────────────────────────┘
+```
+
+> 当任务还是单轮生成 → Prompt 是关键；
+> 当任务依赖外部知识 → Context 是关键；
+> 当任务进入长链路、可执行、低容错 → Harness 几乎不可避免。
+
+### 0.2 Harness Engineering 是什么
+
+LangChain 的工程定义：
+
+```
+agent = model + harness
+harness = agent − model
+```
+
+Harness 原意为「缰绳 / 马具 / 约束装置」。放到 AI 系统里，它是一个 agent 系统中除模型本身外几乎所有决定能否稳定交付的东西。
+
+### 0.3 为什么 Prompt / Context 解决不了长程执行
+
+Prompt 优化的是**意图的表达**；Context 优化的是**信息的供给**。两者主要解决「输入侧」的问题。
+
+但在长链路任务中，模型开始连续行动，会出现新一类问题：
+
+- **计划做得很好，执行跑偏** —— 调错工具、误读返回、慢慢偏航而系统没发现；
+- **自评失真** —— 模型自己干完自己打分，倾向乐观；
+- **上下文焦虑** —— 上下文越来越满，模型开始着急收尾、丢细节；
+- **失败是常态** —— 搜索不准、API 超时、文档格式混乱、工具误用，没有恢复机制就只能从头来。
+
+→ 这些问题 prompt 和 context 都管不到。需要一套外圈的「监督 + 约束 + 纠偏」系统，这就是 Harness。
+
+### 0.4 决定上限 vs 决定落地
+
+> 真正决定能力**上限**的可能是模型，但真正决定能否**落地**、能否**稳定交付**的就是 Harness。
+
+LangChain 在自家智能体上做过实测：模型不变，仅改造 harness，就把榜单排名从 30 开外杀到前五（详见 §13）。
+
+### 0.5 一手出处
+
+- LangChain, "The Rise of Context Engineering", 2025 — https://www.langchain.com/blog/the-rise-of-context-engineering
+- Anthropic, "How we built our multi-agent research system", 2025 — https://www.anthropic.com/engineering/built-multi-agent-research-system
+- Anthropic, "Building Effective Agents", Dec 2024 — https://www.anthropic.com/engineering/building-effective-agents
+
+---
+
 ## 1. Workflow vs Agent（最重要的判别）
 
 | 维度 | Workflow（工作流） | Agent（智能体） |
@@ -147,6 +213,38 @@
 - Anthropic Tool Use（schema-driven）
 - Pydantic Schema + LLM
 - Outlines（开源约束生成）
+
+### 6.7 Harness 6 层架构（统摄视图）
+
+把 §0 的 Harness Engineering 落到工程结构上，分 6 层。这是本知识库其他章节的**实现层映射表**：每一层对应本文档的具体节、对应 skill 的 13 步、并指向常见反模式。
+
+| 层 | 解决的核心问题 | 关键设计准则 | 本文档实现细节 | 13 步映射 | 常见反模式 |
+|---|---|---|---|---|---|
+| **L1 上下文（Context）** | 模型在正确的信息边界内思考 | 角色目标定义、信息裁剪与分层、progressive disclosure（agent.md 当目录页） | §5（记忆四层 working/episodic/semantic/procedural）、§6.6 结构化输出 | 步骤 2-3, 7 | agent.md 大杂烩、把所有信息塞 system prompt |
+| **L2 工具系统（Tools）** | 给什么 / 何时调 / 结果怎么回写 | 最少工具集、明确触发条件（when to use / NOT use）、工具结果筛选回填而非原样塞回 | §6.1 Function Calling、§6.2 MCP、§6.3 A2A、§6.4 Computer Use | 步骤 6 | 工具描述模糊、无调用预算上限 |
+| **L3 执行编排（Orchestration）** | 步骤怎么串、跑偏怎么办 | 推理范式选型、状态机 / 图、任务轨道（理解→补信息→分析→输出→检查→重试）、必要时拆 sub-agent | §2 六大模式、§4 推理范式、§7 多 agent 拓扑 | 步骤 1, 4-5, 8 | 一上来就上多 agent、想到哪做到哪 |
+| **L4 记忆与状态（Memory & State）** | 任务状态 / 会话中间结果 / 长期记忆 三者必须分清 | working / episodic / semantic / procedural 分层；checkpoint 可恢复 | §5 记忆系统四层架构、§9.3 checkpoint | 步骤 7 | 记忆库无限制增长、混在一个池子 |
+| **L5 评估与观测（Eval & Observability）** | 不让 agent「自我感觉良好」→ 独立验收 + 持续 trace | 生产-验收分离（planner/generator/evaluator）、golden set、judge 校准、trace 全覆盖 | §8 评估与可观测性 | 步骤 10, 12 | 自评失真、没有 trace 就上线 |
+| **L6 约束-校验-恢复（Guardrails & Recovery）** | 失败是常态而非例外 | 红线白名单、输出前后校验、retry / circuit breaker / fallback、context reset、HITL 高风险动作审批 | §9.3 可靠性、§9.4 安全护栏、§9.5 HITL | 步骤 3, 11, 13 | 无失败兜底、危险动作没 HITL |
+
+#### 6.7.1 关键设计准则一览
+
+- **Progressive Disclosure（渐进式披露）**：不要一次性把所有能力 / 规范暴露给模型。`agent.md` 应该是目录页 + 索引，详细规范拆到子文档（架构 / 设计 / 执行 / 质量 / 安全），agent 触发时再按需加载。这与 Claude agent skills 的设计哲学同源。
+- **Context Reset > Context Compaction**：长程任务中，光把上下文压短不能消除模型的「负担感」（着急收尾、丢细节）。Anthropic 的解法：换一个干净的新 agent 接力，把关键状态作为交接物传递 —— 像内存泄漏后重启进程而不是反复清缓存。
+- **Production-Validation Split（生产-验收分离）**：让生成 agent 自己给自己打分会偏乐观。把 planner（拆需求）/ generator（实现）/ evaluator（独立验收，能真实操作页面看结果）三角拆开。
+- **Environment-Driven Design（环境驱动设计）**：agent 出问题时，第一反应不是调 prompt 让它「更小心」，而是问「环境里缺什么结构性能力」（缺工具 / 缺反馈链路 / 缺独立验证 / 任务粒度太大 / 看不到自己的工作结果）。OpenAI 的 100% agent 编写代码项目的核心方法论。
+- **反馈链路闭环**：agent 必须能看到自己工作的真实结果（浏览器截图 / 日志 / 指标 / eval 跑分），否则就是闭眼提交。
+
+#### 6.7.2 Harness 6 层与单层升级路径
+
+不是一开始就把 6 层都堆满。按需启用：
+
+```
+最小 harness：L1 + L2 + L3（基础 ReAct）
++ 跨会话需求 → 启用 L4
++ 进入生产 → 必须启用 L5
++ 涉及外部副作用 / 长程任务 → 必须启用 L6
+```
 
 ---
 
@@ -303,6 +401,8 @@
 
 ## 11. 反模式与红旗
 
+### 11.1 架构层面
+
 ❌ **过度设计型**：
 - 一上来就上多 agent / LangGraph 复杂图（YAGNI）
 - 把 agent 当万能锤（适合 workflow 的硬要 agent）
@@ -328,14 +428,125 @@
 - 单点 LLM 故障无降级
 - 无版本化（改 prompt 出问题无法回滚）
 
+### 11.2 Harness 层面（一线公司踩过的最新坑）
+
+❌ **上下文焦虑型（Context Anxiety）**
+- **症状**：长程任务中模型快装满上下文时开始着急收尾、丢细节、甚至自动「找借口结束」。
+- **错误做法**：只做 context compaction（压缩历史）。压缩后变短了，但模型感受到的「负担」并未真消失。
+- **正确做法**：context reset —— 换一个干净的新 agent 接力，把已确定的关键状态作为交接物传给新 agent。像内存泄漏后重启进程，而不是反复清缓存。
+
+❌ **自评失真型（Self-Evaluation Bias）**
+- **症状**：让生成 agent 自己评自己的输出，pass rate 很高但生产环境一塌糊涂。在设计 / 体验 / 完整度等无标准答案的任务上尤其严重。
+- **错误做法**：在同一个 agent 里加「请你检查刚才的输出」一段。
+- **正确做法**：planner（拆需求）/ generator（实现）/ evaluator（独立验收）三角分离。evaluator 必须是独立 agent，且能真实操作页面 / 调真实接口看实际结果，不只是抽象审查。
+
+❌ **「更努力」幻觉（Try Harder Fallacy）**
+- **症状**：agent 跑偏时反复调 prompt 让它「更小心」「更仔细」「请务必……」，没用。
+- **错误做法**：prompt 越写越长、越来越多「请记住 / 请确保 / 请注意」。
+- **正确做法**：问「环境里缺什么结构性能力」—— 缺工具？缺反馈链路？缺独立验证？任务粒度太大？agent 看不到自己工作的结果？修复几乎从来不是「更努力」，而是补齐缺失的 harness 层。
+
+❌ **agent.md 大杂烩（Agent Doc Dump）**
+- **症状**：把所有规范、框架、约定、SOP 一次性塞进 system prompt 或 `agent.md`，agent 表现反而更糊涂。
+- **错误做法**：写一个几千行的 `agent.md` 全塞进上下文。
+- **正确做法**：`agent.md` 当目录页 + 索引，只保留最少的核心元信息；详细规范拆到架构文档 / 设计文档 / 执行计划 / 质量评分 / 安全规则等子文档里，agent 触发时按需加载（progressive disclosure）。这与 Claude agent skills 的设计哲学同源。
+
 ---
 
-## 12. 术语速查
+## 12. 一线公司 Harness 实践案例
+
+> 这些案例的价值不是细节本身，而是它们暴露的**可迁移设计原则**。
+
+### 12.1 LangChain：Harness 决定上限
+
+- **背景**：在某 agent 榜单上，LangChain 自家智能体排名 30 开外。
+- **关键变更**：底层模型完全不变，只改造和迭代 harness（编排 / 工具集 / 评估闭环 / 错误恢复）。
+- **结果**：榜单排名跃升至前五。
+- **启示**：模型决定能力天花板，但 harness 决定能不能摸到天花板。在抱怨「模型不够强」之前，先问「harness 是不是没做完」。
+- **出处**：LangChain blog "The Rise of Context Engineering", 2025 — https://www.langchain.com/blog/the-rise-of-context-engineering
+
+### 12.2 Anthropic：Context Reset + 生产-验收分离
+
+**问题一：上下文焦虑**
+
+- 长程自主任务中，模型上下文越满，行为越异常（着急收尾、丢细节、甚至「假装完成」）。
+- 业界常用方案：context compaction（压缩历史）。
+- Anthropic 实测发现这不够：压缩后变短了，但「负担感」没消失。
+- 解法：**context reset** —— 换一个干净的新 agent 接力，把关键状态作为结构化交接物传递。类比：内存泄漏后重启进程，而不是反复清缓存。
+
+**问题二：自评失真**
+
+- 让生成 agent 自己给自己打分会偏乐观，尤其在设计 / 体验 / 产品完整度类任务。
+- 解法：**planner / generator / evaluator 三角分离**。
+  - **Planner**：把模糊需求扩展成完整规格
+  - **Generator**：逐步实现
+  - **Evaluator**：像 QA 一样真实测试，独立 agent，能真实操作页面 / 检查实际结果
+- 关键工程原则：**生产-验收分离**。只要评估者足够独立，就能形成「生成 → 检查 → 修复 → 再检查」的有效循环。
+
+- **出处**：Anthropic, "How we built our multi-agent research system", 2025 — https://www.anthropic.com/engineering/built-multi-agent-research-system
+
+### 12.3 OpenAI：人类只设计环境 + Progressive Disclosure + 让 agent 看见整个应用
+
+**实践一：人类只设计环境，agent 写所有代码**
+
+- 一个只有几名人类工程师的团队，用 agent 从零构建超百万行代码的生产级应用，100% 代码由 agent 编写。
+- 工程师的工作变成三件事：
+  1. **拆任务**：把产品目标拆成 agent 能理解的小任务
+  2. **给能力**：agent 失败时，问「环境里缺什么能力」而不是「让它更努力一点」
+  3. **建反馈链路**：让 agent 真正能看到自己的工作结果
+
+**实践二：Progressive Disclosure（agent.md 当目录页）**
+
+- 早期错误：写了一个巨大的 `agent.md` 把所有规范全塞进去 → agent 更糊涂。
+- 改进：`agent.md` 变成目录页 + 索引，详细内容拆到架构 / 设计 / 执行 / 质量 / 安全等子文档，agent 按需钻进去。
+- 与 Claude agent skills 同源：上下文优化不是「给得更多」，而是「按需给、分层给、在正确的时机给」。
+
+**实践三：让 agent 看见整个应用（不只让它写代码）**
+
+- 速度上来后，瓶颈不再是「写」而是「验」，人类根本验不过来。
+- 解法：让 agent 自己验：
+  - 接浏览器（截图、点页面、模拟用户操作）
+  - 接日志系统和指标系统（查 log、查监控）
+  - 每个任务在独立隔离环境跑（互不影响）
+- agent 不再是「写完就说写完了」，而是真的能跑起来看结果、发现 bug、修 bug、再验证。
+
+**实践四：把资深经验写成系统规则**
+
+- 人类 code review 跟不上 agent 提交速度。
+- 解法：把资深工程师的经验写成系统规则（模块分层、依赖规则、什么情况必须拦截）。
+- 关键：规则不只报错，还把「怎么修」一起反馈给 agent，进入下一轮上下文。
+- 这已经不是传统代码规范，而是一套**可持续运行的自动治理系统**。
+
+- **出处**：OpenAI 公开工程访谈与博客，2025（具体 URL 因平台分散；本知识库仅引用经过核实的稳定路径，OpenAI 单条文章 URL 易变动，故以「公开工程访谈 2025」标注）
+
+### 12.4 三家共同的设计哲学
+
+| 设计原则 | LangChain | Anthropic | OpenAI |
+|---------|-----------|-----------|--------|
+| Harness 决定能否落地 | ✅ 模型不变改 harness | ✅ context reset / 三角分离 | ✅ 人类只设计环境 |
+| Progressive Disclosure | — | — | ✅ agent.md 当目录页 |
+| 生产-验收分离 | — | ✅ planner/gen/eval | ✅ agent 自己验 + 系统规则 |
+| 环境驱动设计 | ✅ harness 是环境 | — | ✅ 缺什么能力 vs 更努力 |
+| 反馈链路闭环 | — | ✅ evaluator 真操作 | ✅ 浏览器+日志+指标 |
+
+→ 这就是 `agent架构师` skill 引导用户走 13 步的底层工程哲学。
+
+---
+
+## 13. 术语速查
 
 | 术语 | 含义 |
 |------|------|
 | **Workflow** | LLM 步骤由代码 / 图预编排的系统 |
 | **Agent** | LLM 自主决定行动序列与终止条件的系统 |
+| **Harness** | 缰绳 / 马具 / 约束装置；agent 系统中除模型外的整套运行外壳（`agent = model + harness`）|
+| **Prompt Engineering** | 让模型听懂任务（角色、few-shot、约束输出）|
+| **Context Engineering** | 让模型拿到正确信息（RAG、上下文裁剪、progressive disclosure）|
+| **Harness Engineering** | 让模型在真实执行中持续做对（工具 / 编排 / 状态 / 评估 / 约束-恢复 整套外壳）|
+| **Context Reset** | 不是 compaction，而是换一个干净的新 agent 接力，把关键状态作为交接物传递 |
+| **Context Compaction** | 压缩历史上下文以腾出窗口（仍在原 agent 里）|
+| **Progressive Disclosure** | 渐进式披露；agent.md / system prompt 当目录页 + 索引，详细规范按需加载 |
+| **Production-Validation Split** | 生产-验收分离；planner / generator / evaluator 三角必须是独立 agent |
+| **Environment-Driven Design** | 环境驱动设计；agent 出问题先问「环境里缺什么结构性能力」，而不是「让模型更努力」|
 | **ReAct** | Reason + Act 循环范式 |
 | **MCP** | Model Context Protocol（Anthropic 主导的工具协议标准）|
 | **A2A** | Agent-to-Agent（Google 主导的 agent 互通协议）|
@@ -353,9 +564,16 @@
 
 ## 参考一手资料
 
-- Anthropic, "Building Effective Agents", Dec 2024
+**Harness Engineering 与 Context Engineering（2025+）**：
+- LangChain, "The Rise of Context Engineering", 2025 — https://www.langchain.com/blog/the-rise-of-context-engineering
+- Anthropic, "How we built our multi-agent research system", 2025 — https://www.anthropic.com/engineering/built-multi-agent-research-system
+- OpenAI 公开工程访谈（2025）：人类只设计环境 / agent.md 当目录页 / 让 agent 看见整个应用 / 资深经验写成系统规则（具体 URL 因平台分散，本知识库仅引用经过核实的稳定路径）
+- 中文科普：花园老师《最近爆火的 Harness Engineering 到底是个啥》, 2025（"科特秘密花园" 视频，对三阶段演进与 6 层 Harness 的系统讲解）
+
+**Agent 架构基础**：
+- Anthropic, "Building Effective Agents", Dec 2024 — https://www.anthropic.com/engineering/building-effective-agents
 - Andrew Ng, "Agentic Design Patterns" series, deeplearning.ai, 2024
-- Anthropic, Model Context Protocol spec, 2024
+- Anthropic, Model Context Protocol spec, 2024 — https://modelcontextprotocol.io
 - Google, A2A Protocol spec, 2025
 - Lilian Weng, "LLM Powered Autonomous Agents", 2023
 - Chip Huyen, "Agents", huyenchip.com, 2025

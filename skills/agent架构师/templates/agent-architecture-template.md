@@ -103,6 +103,34 @@
 | [agent-1] | | | |
 | [agent-2] | | | |
 
+### 3.6 Harness 6 层映射表（必填）
+
+> 本章节是 vibe-coding 的「checklist 之眼」。AI coding 工具按 Phase 1 任务清单实现时，每完成一个任务对照本表检查 6 层覆盖情况。任何一层留空都意味着该层是潜在的失败点。
+
+| Harness 层 | 本架构如何落地 | 对应章节 | 上线前验收点 |
+|---|---|---|---|
+| **L1 上下文** | [system prompt 主体 / 信息分层策略 / context budget 上限 / progressive disclosure 是否启用] | §8.2 system prompt | [ ] system prompt 不超过 X tokens；agent.md 是目录页而非全量规范 |
+| **L2 工具系统** | [工具集列表 / MCP server 复用 / 工具调用预算] | §4 | [ ] 每个工具有明确的 when/when NOT to use；调用次数有上限 |
+| **L3 执行编排** | [推理范式 / 状态机 / 多 agent 拓扑 / 任务轨道] | §3.3, §3.4, §3.5 | [ ] 决策循环图完整；失败路径有明确分支 |
+| **L4 记忆与状态** | [4 层记忆启用情况与存储方案 / checkpoint 机制] | §5 | [ ] 任务态 / 会话中间结果 / 长期记忆三者隔离；checkpoint 可恢复 |
+| **L5 评估与观测** | [golden set 数量 / judge prompt / trace 工具 / 是否 planner-generator-evaluator 三角分离] | §9, §6.4 | [ ] eval 自动化跑通；trace 全覆盖；evaluator 是独立 agent（生产-验收分离） |
+| **L6 约束-校验-恢复** | [红线 / HITL 断点 / retry 策略 / fallback / context reset 机制] | §2, §10 | [ ] 危险动作前 HITL；长程任务有 context reset；所有失败有兜底 |
+
+→ 全部填实后，参照本架构开发的 agent 才是 harness-complete 的。
+
+### 3.7 环境驱动设计自检（必填）
+
+> 这 6 条核对源自 OpenAI / Anthropic / LangChain 在 2025 年的一线实践。每一条都不是「锦上添花」，而是落地 agent 与 demo agent 的分水岭。
+
+- [ ] **任务粒度**：任务被拆成 agent 看得懂的最小单位（不是「让 agent 完成全部需求」一句话扔过去）
+- [ ] **缺什么 vs 更努力**：失败时第一反应是问「环境里缺什么结构性能力」，而不是「prompt 怎么改得更小心」
+- [ ] **反馈闭环**：agent 能看到自己工作的真实结果（浏览器截图 / 日志 / 指标 / eval 跑分），不是闭眼提交
+- [ ] **Progressive Disclosure**：system prompt / agent.md 是目录页 + 索引，详细规范按需加载（不是大杂烩）
+- [ ] **生产-验收分离**：planner（拆需求）/ generator（实现）/ evaluator（独立验收）不是同一个 agent
+- [ ] **Context Reset**：长程任务有 context reset 机制（不只 compaction）；失败能从 checkpoint 恢复，不必从头开始
+
+→ 任何一条留空都是已知的红旗。开发过程中持续核对。
+
 ---
 
 ## 4. 工具集（Tools）
@@ -517,11 +545,21 @@ if __name__ == "__main__":
 
 - **Simplicity First**（Anthropic, Dec 2024）：能用 workflow 不用 agent
 - **Eval First**：先有 golden set 再写代码
-- **Observability First**：第一天就接 trace
+- **Harness First**（LangChain / Anthropic / OpenAI, 2025）：决定 agent 能否落地的是除模型外的整套系统；改 prompt 之前先问 harness 6 层是否完整
+- **Observability First**：第一天就接 trace（属于 Harness L5 的实现）
 - **Cost Awareness**：每个新增能力都问 token 涨多少
+- **Environment-Driven Design**：agent 出问题时先问环境缺什么能力，而不是让模型「更努力」
+- **Progressive Disclosure**：system prompt / agent.md 是目录页，详细规范按需加载
+- **Production-Validation Split**：planner / generator / evaluator 三角分离，evaluator 必须独立
 
 ## 附录 B：参考资料
 
+**Harness Engineering 与 Context Engineering（2025+）**：
+- LangChain, "The Rise of Context Engineering", 2025 — https://www.langchain.com/blog/the-rise-of-context-engineering
+- Anthropic, "How we built our multi-agent research system", 2025 — https://www.anthropic.com/engineering/built-multi-agent-research-system
+- OpenAI 公开工程访谈 / 博客（2025）：人类只设计环境 / agent.md 当目录页 / 让 agent 看见整个应用
+
+**Agent 架构基础**：
 - Anthropic, "Building Effective Agents", Dec 2024 — https://www.anthropic.com/engineering/building-effective-agents
 - Andrew Ng, "Agentic Design Patterns", deeplearning.ai
 - Model Context Protocol — https://modelcontextprotocol.io
